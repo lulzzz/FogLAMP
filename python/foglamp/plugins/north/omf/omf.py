@@ -766,7 +766,7 @@ class OmfNorthPlugin(object):
                 # Evaluate the HTTP status codes
                 if not str(status_code).startswith('2'):
 
-                    _tmp_text = str(status_code) + " " + text
+                    _tmp_text = "status code " + str(status_code) + " - " + text
                     _message = plugin_common.MESSAGES_LIST["e000024"].format(self._config['URL'], _tmp_text)
                     _error = plugin_exceptions.URLPostError(_message)
 
