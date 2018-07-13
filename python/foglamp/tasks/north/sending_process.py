@@ -922,7 +922,6 @@ class SendingProcess:
                                 stream_id)
 
                         except Exception as ex:
-
                             _message = _MESSAGES_LIST["e000021"].format(ex)
                             SendingProcess._logger.error(_message)
                             await self._audit.failure(self._AUDIT_CODE, {"error - on _task_send_data": _message})
