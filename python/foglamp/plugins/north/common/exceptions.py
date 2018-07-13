@@ -14,8 +14,8 @@ __version__ = "${VERSION}"
 __all__ = ('NorthPluginException', 'DataSendError')
 
 
-class URLFetchError(RuntimeError):
-    """ Unable to fetch from the HTTP server """
+class URLPostError(Exception):
+    """ Unable to post to the HTTP server """
     pass
 
 

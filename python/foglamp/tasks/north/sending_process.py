@@ -269,7 +269,7 @@ class SendingProcess:
     TASK_SEND_SLEEP = 0.5
     """ The amount of time the sending operation will sleep in case of an error """
 
-    TASK_SLEEP_MAX_INCREMENTS = 4
+    TASK_SLEEP_MAX_INCREMENTS = 7
     """ Maximum number of increments for the sleep handling, the amount of time is doubled at every sleep """
 
     TASK_SEND_UPDATE_POSITION_MAX = 10
@@ -922,6 +922,7 @@ class SendingProcess:
                                 stream_id)
 
                         except Exception as ex:
+
                             _message = _MESSAGES_LIST["e000021"].format(ex)
                             SendingProcess._logger.error(_message)
                             await self._audit.failure(self._AUDIT_CODE, {"error - on _task_send_data": _message})
