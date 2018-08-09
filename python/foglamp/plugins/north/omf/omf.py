@@ -592,6 +592,9 @@ class OmfNorthPlugin(object):
         for item in asset_data:
             item_type = plugin_common.evaluate_type(asset_data[item])
             omf_type[typename][1]["properties"][item] = {"type": item_type}
+            item_format = plugin_common.evaluate_omf_format(asset_data[item])
+            if item_format is not None:
+                omf_type[typename][1]["properties"][item].update({"format": item_format})
         if _log_debug_level == 3:
             self._logger.debug("_create_omf_type_automatic - sensor_id |{0}| - omf_type |{1}| ".format(sensor_id, str(omf_type)))
 

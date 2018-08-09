@@ -104,6 +104,30 @@ def evaluate_type(value):
     return evaluated_type
 
 
+def evaluate_omf_format(value):
+    """
+    OMF Integer types:
+    Type	Format	        Default Value	Description             Range
+    integer	int16	            0	        16-bit integer          –32,768 to 32,767
+    integer	int32(default)	    0	        32-bit integer          –2,147,483,648 to 2,147,483,647
+    integer	int64	            0	        64-bit  integer         –9,223,372,036,854,775,808 to 9,223,372,036,854,775,807
+    integer	uint16	            0	        16-bit unsigned integer 0 to 65,535
+    integer	uint32	            0	        32-bit unsigned integer 0 to 4,294,967,295
+    integer	uint64	            0	        64-bit unsigned integer 0 to 18,446,744,073,709,551,615
+    number	float64	            0	        64-bit floating point   1.7E +/- 308 (15 digits)
+    number	float32(default)    0	        32-bit floating point   3.4E +/- 38 (7 digits)
+    number	float16	            0	        16-bit floating point       
+    """
+    value_type = evaluate_type(value)
+    new_format = None
+    # TODO: Decide proper format based upon data for interger and number types and not blindly for all numeric types
+    if value_type == "integer":
+        new_format = "int64"
+    elif value_type == "number":
+        new_format = "float64"
+
+    return new_format
+
 def identify_unique_asset_codes(raw_data):
     """Identify unique asset codes in the data block
 
