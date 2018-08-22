@@ -18,7 +18,7 @@ from foglamp.services.core.api import certificate_store
 from foglamp.services.core.api import support
 from foglamp.services.core.api import plugin_discovery
 from foglamp.services.core.api import task
-from foglamp.services.core.api import asset_tracker
+from foglamp.services.core.api import filters
 
 __author__ = "Ashish Jabble, Praveen Garg, Massimiliano Pinto"
 __copyright__ = "Copyright (c) 2017-2018 OSIsoft, LLC"
@@ -91,11 +91,7 @@ def setup(app):
     app.router.add_route('POST', '/foglamp/service', service.add_service)
     app.router.add_route('GET', '/foglamp/service', service.get_health)
 
-    # assets
     browser.setup(app)
-
-    # asset tracker
-    app.router.add_route('GET', '/foglamp/track', asset_tracker.get_asset_tracker_events)
 
     # Statistics - As per doc
     app.router.add_route('GET', '/foglamp/statistics', api_statistics.get_statistics)
@@ -137,6 +133,9 @@ def setup(app):
 
     # Task
     app.router.add_route('POST', '/foglamp/scheduled/task', task.add_task)
+
+    # Filters 
+    app.router.add_route('POST', '/foglamp/filter', filters.add_filter)
 
     # enable cors support
     enable_cors(app)
