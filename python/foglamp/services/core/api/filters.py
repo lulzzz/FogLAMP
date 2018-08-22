@@ -6,6 +6,7 @@
 
 import datetime
 import json
+import copy
 from aiohttp import web
 from foglamp.common.storage_client.payload_builder import PayloadBuilder
 from foglamp.common.configuration_manager import ConfigurationManager
@@ -23,9 +24,12 @@ __license__ = "Apache 2.0"
 __version__ = "${VERSION}"
 
 _help = """
-    -----------------------------------------------------------------------
-    | POST            | /foglamp/filter                               |
-    -----------------------------------------------------------------------
+    --------------------------------------------------------------------------------------------
+    | POST            | /foglamp/filter                                                        |
+    | PUT             | /foglamp/filteri/{service_name}/pipeline                               |
+    | PUT             | /foglamp/filteri/{service_name}/pipeline?append_filter=true|false      |
+    | PUT             | /foglamp/filteri/{service_name}/pipeline?allow_duolicates=true|false   |
+    --------------------------------------------------------------------------------------------
 """
 
 _LOGGER = logger.setup("filter")
@@ -109,7 +113,7 @@ async def create_filter(request):
             raise Exception(message)
 
     except Exception as ex:
-        _LOGGER.error("Caught exception: " + str(ex))
+        _LOGGER.error("Add filter, caught exception: " + str(ex))
         raise web.HTTPInternalServerError(reason=str(ex))
 
     # Success: return new filter content
@@ -117,3 +121,125 @@ async def create_filter(request):
                               'description': filter_desc,
                               'value': category_info})
 
+"""
+    Add filter names to "filter" item in {service_name}
+
+    PUT /foglamp/filter/{service_name}/pipeline
+ 
+    'pipeline' is the array of filter category names to set
+    into 'filter' default/value properties
+
+    :Example: set 'pipeline' for service 'NorthReadings_to_PI'
+    curl -X PUT http://localhost:8081/foglamp/filter/NorthReadings_to_PI/pipeline -d 
+    '{
+        "pipeline": ["Scale10Filter", "Python_assetCodeFilter"],
+    }'
+
+    Configuration item 'filter' is added to {service_name}
+    or updated with the pipeline arryay
+
+    Returns the filter pipeline on success:
+    {"pipeline": ["Scale10Filter", "Python_assetCodeFilter"]} 
+
+    Query string parameters:
+    - append_filter=true|false       Default true
+    - allow_duplicates=true|false    Default true
+
+    NOTE: the method also adds the filters category names under
+    parent category {service_name}
+"""
+
+async def add_filters_pipeline(request):
+    try:
+        # Get inout data
+        data = await request.json()
+        # Get filters list
+        filter_list = data.get('pipeline')
+        # Get filter name
+        service_name = request.match_info.get('service_name', None)
+        # Item name to add/update
+        config_item = "filter"
+
+        # Get configuration manager instance
+        cf_mgr = ConfigurationManager(connect.get_storage_async())
+        # Fetch the filter items: get category items
+        category_info = await cf_mgr.get_category_all_items(category_name = service_name)
+        if category_info is None:
+            # Error filter_name doesn't exist
+            message = "No such '%s' category found." % service_name
+            return web.HTTPNotFound(reason=message)
+
+        # Check whether config_item already exists
+        if (config_item in category_info):
+            # We just need to update the value of config_item
+            # with the "pipeline" property
+            # Check whether we want to replace or update the list
+            # or we allow duplicate entries in the list
+            # Default: append and allow duplicates
+            append_filter = 'true'
+            allow_duplicates = 'true'
+            if 'append_filter' in request.query and request.query['append_filter'] != '':
+                append_filter = request.query['append_filter'].lower()
+                if append_filter not in ['true', 'false']:
+                    raise ValueError("Only 'true' and 'false' are allowed for " \
+                                     "append_filter. {} given.".format(append_filter))
+            if 'allow_duplicates' in request.query and request.query['allow_duplicates'] != '':
+                allow_duplicates = request.query['allow_duplicates'].lower()
+                if allow_duplicates not in ['true', 'false']:
+                    raise ValueError("Only 'true' and 'false' are allowed for " \
+                                     "allow_duplicates. {} given.".format(allow_duplicates))
+
+            if (append_filter == 'true'):
+                # 'value' holds the string version of a list: convert it first  
+                current_value = json.loads(category_info[config_item]['value'])
+                # Save current list (ddepcopy)
+                new_list = copy.deepcopy(current_value['pipeline'])
+                # iterate inout filters list
+                for filter in filter_list:
+                    # Check whether we need to add this filter
+                    if (allow_duplicates == 'true' or (filter not in current_value['pipeline'])):
+                        # Add the new filter to new_list
+                        new_list.append(filter)
+            else:
+               # iOverwriting the list: use input list
+               new_list = filter_list
+
+            # Set the pipeline value with the 'new_list' of filters
+            await cf_mgr.set_category_item_value_entry(service_name,
+                                                       config_item,
+                                                       {'pipeline': new_list})
+        else:
+            # Create new item 'config_item'
+            new_item = dict({ config_item : {
+                                    'description': 'Filter pipeline',
+                                    'type': 'JSON',
+                                    'default': {}
+                                }
+                            })
+            # Add the "pipeline" array as a string
+            new_item[config_item]['default'] = json.dumps({'pipeline' : filter_list})
+
+            # Update the filten category entru
+            await cf_mgr.create_category(category_name=service_name,
+                                         category_value=new_item,
+                                         keep_original_items=True)
+
+        # Fetch up-to-date category items
+        result = await cf_mgr.get_category_item(service_name, config_item)
+        if result is None:
+            # Error config_item doesn't exist
+            message = "No detail found for the category_name: {} " \
+                      "and config_item: {}".format(service_name, config_item)
+            return web.HTTPNotFound(reason=message)
+
+        ###########################################################
+        # Add filters as child categories of parent category name #
+        ###########################################################
+        children = await cf_mgr.create_child_category(service_name, filter_list)
+
+    except Exception as ex:
+        _LOGGER.error("Add filters pipeline, caught exception: " + str(ex))
+        raise web.HTTPInternalServerError(reason=str(ex))
+ 
+    # Return the filters pipeline 
+    return web.json_response(json.loads(result['value']))
