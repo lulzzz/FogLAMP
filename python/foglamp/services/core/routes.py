@@ -139,7 +139,7 @@ def setup(app):
     app.router.add_route('POST', '/foglamp/scheduled/task', task.add_task)
 
     # Filters 
-    app.router.add_route('POST', '/foglamp/filter', filters.add_filter)
+    app.router.add_route('POST', '/foglamp/filter', filters.create_filter)
 
     # enable cors support
     enable_cors(app)

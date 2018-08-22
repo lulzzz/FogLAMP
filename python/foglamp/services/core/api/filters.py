@@ -30,7 +30,7 @@ _help = """
 
 _LOGGER = logger.setup("filter")
 
-async def add_filter(request):
+async def create_filter(request):
     """
     Create a new filter with a specific plugin
     
@@ -56,25 +56,31 @@ async def add_filter(request):
 
     """
     try:
+        # Get inout data
         data = await request.json()
+        # Get filter name
         filter_name = data.get('name')
+        # Get plugin name
         plugin_name = data.get('plugin')
+        # Set filter description
         filter_desc = 'Configuration of \'' + filter_name + '\' filter for plugin \'' + plugin_name + '\'' 
-
         # Get configuration manager instance
         cf_mgr = ConfigurationManager(connect.get_storage_async())
-
         # Load the specified plugin and get plugin data
         loaded_plugin_info = apiutils.get_plugin_info(plugin_name)
-
         # Get plugin default configuration (dict)
         plugin_config = loaded_plugin_info['config']
-
         # Get plugin type (string)
         loaded_plugin_type = loaded_plugin_info['type'];
-
         # Get plugin name (string)
         loaded_plugin_name = plugin_config['plugin']['default'];
+
+        # Check first whether fiter name already exists
+        category_info = await cf_mgr.get_category_all_items(category_name = filter_name)
+        if category_info is not None:
+            # Filter name already exists: return error
+            message = "Filter '%s' already exists." % filter_name
+            return web.HTTPBadRequest(reason=message)
 
         # Sanity checks
         if (plugin_name != loaded_plugin_name or loaded_plugin_type != 'filter'):
@@ -94,8 +100,7 @@ async def add_filter(request):
 
         await cf_mgr.create_category(category_name=filter_name,
                                      category_description=filter_desc,
-                                     category_value=plugin_config,
-                                     keep_original_items=True)
+                                     category_value=plugin_config)
 
         # Fetch the new created filter: get category items
         category_info = await cf_mgr.get_category_all_items(category_name = filter_name)
@@ -107,6 +112,7 @@ async def add_filter(request):
         _LOGGER.error("Caught exception: " + str(ex))
         raise web.HTTPInternalServerError(reason=str(ex))
 
+    # Success: return new filter content
     return web.json_response({'filter': filter_name,
                               'description': filter_desc,
                               'value': category_info})
