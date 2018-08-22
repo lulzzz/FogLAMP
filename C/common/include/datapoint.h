@@ -31,7 +31,7 @@ class DatapointValue {
 		/**
  		 * Construct with an integer value
 		 */
-		DatapointValue(const int value)
+		DatapointValue(const long value)
 		{
 			m_value.i = value;
 			m_type = T_INTEGER;
@@ -97,7 +97,7 @@ class DatapointValue {
 			return *this;
 		};
 
-		void setValue(int value)
+		void setValue(long value)
 		{
 			m_value.i = value;
 		}
@@ -131,9 +131,9 @@ class DatapointValue {
 		};
 
 		/**
-		 * Return int value
+		 * Return long value
 		 */
-		int toInt() const { return m_value.i; };
+		long toInt() const { return m_value.i; };
 		/**
 		 * Return double  value
 		 */
@@ -152,7 +152,7 @@ class DatapointValue {
 	private:
 		union data_t {
 			std::string	*str;
-			int		i;
+			long		i;
 			double		f;
 			} m_value;
 		DatapointTag	m_type;
