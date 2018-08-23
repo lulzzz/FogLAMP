@@ -4,7 +4,6 @@
 # See: http://foglamp.readthedocs.io/
 # FOGLAMP_END
 
-import datetime
 import json
 import copy
 from aiohttp import web
@@ -50,7 +49,7 @@ async def create_filter(request):
     A new config category 'name' is created:
     items are:
        - 'plugin'
-       - all ityems from default plugin config
+       - all items from default plugin config
 
     NOTE: The 'create_category' call is made with keep_original_items = True
 
@@ -59,11 +58,16 @@ async def create_filter(request):
         # Get inpout data
         data = await request.json()
         # Get filter name
-        filter_name = data.get('name')
+        filter_name = data.get('name', None)
         # Get plugin name
-        plugin_name = data.get('plugin')
+        plugin_name = data.get('plugin', None)
+
+        # Check we have needed input data
+        if not filter_name or not plugin_name:
+            raise web.HTTPBadRequest(reason='Filter name or plugin name are required.')
+
         # Set filter description
-        filter_desc = 'Configuration of \'' + filter_name + '\' filter for plugin \'' + plugin_name + '\'' 
+        filter_desc = 'Configuration of \'' + filter_name + '\' filter for plugin \'' + plugin_name + '\''
         # Get configuration manager instance
         cf_mgr = ConfigurationManager(connect.get_storage_async())
         # Load the specified plugin and get plugin data
@@ -75,27 +79,27 @@ async def create_filter(request):
         # Get plugin name (string)
         loaded_plugin_name = plugin_config['plugin']['default']
 
-        # Check first whether fiter name already exists
-        category_info = await cf_mgr.get_category_all_items(category_name = filter_name)
+        # Check first whether filter name already exists
+        category_info = await cf_mgr.get_category_all_items(category_name=filter_name)
         if category_info is not None:
             # Filter name already exists: return error
             message = "Filter '%s' already exists." % filter_name
             return web.HTTPBadRequest(reason=message)
 
         # Sanity checks
-        if (plugin_name != loaded_plugin_name or loaded_plugin_type != 'filter'):
-             errorMessage = "Loaded plugin '" + loaded_plugin_name + \
+        if plugin_name != loaded_plugin_name or loaded_plugin_type != 'filter':
+            error_message = "Loaded plugin '" + loaded_plugin_name + \
                             "', type '" + loaded_plugin_type + \
                             "', doesn't match the specified one '" + \
                             plugin_name + "', type 'filter'"
-             raise Exception(errorMessage)
+            raise ValueError(error_message)
 
         #################################################
         # Set string value for 'default' if type is JSON
         # This is required by the configuration manager
         ################################################# 
         for key, value in plugin_config.items():
-            if (value['type'] == 'JSON'):
+            if value['type'] == 'JSON':
                 value['default'] = json.dumps(value['default'])
 
         await cf_mgr.create_category(category_name=filter_name,
@@ -103,19 +107,19 @@ async def create_filter(request):
                                      category_value=plugin_config)
 
         # Fetch the new created filter: get category items
-        category_info = await cf_mgr.get_category_all_items(category_name = filter_name)
+        category_info = await cf_mgr.get_category_all_items(category_name=filter_name)
         if category_info is None:
             message = "No such '%s' filter found" % filter_name
-            raise Exception(message)
+            raise ValueError(message)
+        else:
+            # Success: return new filter content
+            return web.json_response({'filter': filter_name,
+                                      'description': filter_desc,
+                                      'value': category_info})
 
-    except Exception as ex:
-        _LOGGER.error("Add filter, caught exception: " + str(ex))
-        raise web.HTTPInternalServerError(reason=str(ex))
-
-    # Success: return new filter content
-    return web.json_response({'filter': filter_name,
-                              'description': filter_desc,
-                              'value': category_info})
+    except ValueError as ex:
+        _LOGGER.exception("Add filter, caught exception: " + str(ex))
+        raise web.HTTPNotFound(reason=str(ex))
 
 """
     Add filter names to "filter" item in {service_name}
@@ -160,24 +164,31 @@ async def add_filters_pipeline(request):
         # Get inout data
         data = await request.json()
         # Get filters list
-        filter_list = data.get('pipeline')
+        filter_list = data.get('pipeline', None)
         # Get filter name
         service_name = request.match_info.get('service_name', None)
         # Item name to add/update
         config_item = "filter"
 
+        # Check input data
+        if not service_name or not filter_list:
+             raise web.HTTPBadRequest(reason='Service name or pipeline are required')
+
+        if type(filter_list) is not list: 
+             raise web.HTTPBadRequest(reason='pipeline must be a list of filters')
+
         # Get configuration manager instance
         cf_mgr = ConfigurationManager(connect.get_storage_async())
 
         # Fetch the filter items: get category items
-        category_info = await cf_mgr.get_category_all_items(category_name = service_name)
+        category_info = await cf_mgr.get_category_all_items(category_name=service_name)
         if category_info is None:
             # Error service__name doesn't exist
             message = "No such '%s' category found." % service_name
             return web.HTTPNotFound(reason=message)
 
         # Check whether config_item already exists
-        if (config_item in category_info):
+        if config_item in category_info:
             # We just need to update the value of config_item
             # with the "pipeline" property
             # Check whether we want to replace or update the list
@@ -188,28 +199,28 @@ async def add_filters_pipeline(request):
             if 'append_filter' in request.query and request.query['append_filter'] != '':
                 append_filter = request.query['append_filter'].lower()
                 if append_filter not in ['true', 'false']:
-                    raise ValueError("Only 'true' and 'false' are allowed for " \
+                    raise ValueError("Only 'true' and 'false' are allowed for "
                                      "append_filter. {} given.".format(append_filter))
             if 'allow_duplicates' in request.query and request.query['allow_duplicates'] != '':
                 allow_duplicates = request.query['allow_duplicates'].lower()
                 if allow_duplicates not in ['true', 'false']:
-                    raise ValueError("Only 'true' and 'false' are allowed for " \
+                    raise ValueError("Only 'true' and 'false' are allowed for "
                                      "allow_duplicates. {} given.".format(allow_duplicates))
 
-            if (append_filter == 'true'):
+            if append_filter == 'true':
                 # 'value' holds the string version of a list: convert it first  
                 current_value = json.loads(category_info[config_item]['value'])
-                # Save current list (ddepcopy)
+                # Save current list (deepcopy)
                 new_list = copy.deepcopy(current_value['pipeline'])
                 # iterate inout filters list
-                for filter in filter_list:
+                for _filter in filter_list:
                     # Check whether we need to add this filter
-                    if (allow_duplicates == 'true' or (filter not in current_value['pipeline'])):
+                    if allow_duplicates == 'true' or (_filter not in current_value['pipeline']):
                         # Add the new filter to new_list
-                        new_list.append(filter)
+                        new_list.append(_filter)
             else:
-               # iOverwriting the list: use input list
-               new_list = filter_list
+                # Overwriting the list: use input list
+                new_list = filter_list
 
             # Set the pipeline value with the 'new_list' of filters
             await cf_mgr.set_category_item_value_entry(service_name,
@@ -217,14 +228,15 @@ async def add_filters_pipeline(request):
                                                        {'pipeline': new_list})
         else:
             # Create new item 'config_item'
-            new_item = dict({ config_item : {
-                                    'description': 'Filter pipeline',
-                                    'type': 'JSON',
-                                    'default': {}
-                                }
-                            })
+            new_item = dict({config_item: {
+                'description': 'Filter pipeline',
+                'type': 'JSON',
+                'default': {}
+            }
+            })
+
             # Add the "pipeline" array as a string
-            new_item[config_item]['default'] = json.dumps({'pipeline' : filter_list})
+            new_item[config_item]['default'] = json.dumps({'pipeline': filter_list})
 
             # Update the filter category entry
             await cf_mgr.create_category(category_name=service_name,
@@ -242,10 +254,10 @@ async def add_filters_pipeline(request):
         ###########################################################
         # Add filters as child categories of parent category name #
         ###########################################################
-        children = await cf_mgr.create_child_category(service_name, filter_list)
+        await cf_mgr.create_child_category(service_name, filter_list)
 
-    except Exception as ex:
-        _LOGGER.error("Add filters pipeline, caught exception: " + str(ex))
+    except ValueError as ex:
+        _LOGGER.exception("Add filters pipeline, caught exception: " + str(ex))
         raise web.HTTPInternalServerError(reason=str(ex))
  
     # Return the filters pipeline 
