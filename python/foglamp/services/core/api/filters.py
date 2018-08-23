@@ -7,10 +7,8 @@
 import json
 import copy
 from aiohttp import web
-from foglamp.common.storage_client.payload_builder import PayloadBuilder
 from foglamp.common.configuration_manager import ConfigurationManager
 from foglamp.services.core import connect
-from foglamp.common.storage_client.exceptions import StorageServerError
 from foglamp.services.core.api import utils as apiutils
 from foglamp.common import logger
 
@@ -64,7 +62,7 @@ async def create_filter(request):
 
         # Check we have needed input data
         if not filter_name or not plugin_name:
-            raise web.HTTPBadRequest(reason='Filter name or plugin name are required.')
+            return web.HTTPBadRequest(reason='Filter name or plugin name are required.')
 
         # Set filter description
         filter_desc = 'Configuration of \'' + filter_name + '\' filter for plugin \'' + plugin_name + '\''
@@ -87,12 +85,12 @@ async def create_filter(request):
             return web.HTTPBadRequest(reason=message)
 
         # Sanity checks
-        if plugin_name != loaded_plugin_name or loaded_plugin_type != 'filter':
-            error_message = "Loaded plugin '" + loaded_plugin_name + \
-                            "', type '" + loaded_plugin_type + \
-                            "', doesn't match the specified one '" + \
-                            plugin_name + "', type 'filter'"
-            raise ValueError(error_message)
+        if plugin_name != loaded_plugin_name or loaded_plugin_type != 'filer':
+            error_message = "Loaded plugin '{0}', type '{1}', doesn't match " + \
+            "the specified one '{2}', type 'filter'"
+            raise ValueError(error_message.format(loaded_plugin_name,
+                                                  loaded_plugin_type,
+                                                  plugin_name))
 
         #################################################
         # Set string value for 'default' if type is JSON
@@ -174,11 +172,14 @@ async def add_filters_pipeline(request):
         config_item = "filter"
 
         # Check input data
-        if not service_name or not filter_list:
-             raise web.HTTPBadRequest(reason='Service name or pipeline are required')
+        if not service_name:
+             return web.HTTPBadRequest(reason='Service name is required')
 
-        if type(filter_list) is not list: 
-             raise web.HTTPBadRequest(reason='pipeline must be a list of filters')
+        # Empty list [] is allowed as it clears the pipeline
+        # curl -X PUT http://localhost:8081/foglamp/filter/ServiceName/pipeline -d '{"pipeline": []}'
+        # Check filter_list is alist only if filter_list in not None
+        if filter_list is not None and not isinstance(filter_list, list):
+             return web.HTTPBadRequest(reason='Pipeline must be a list of filters or an empty value')
 
         # Get configuration manager instance
         cf_mgr = ConfigurationManager(connect.get_storage_async())
@@ -210,7 +211,9 @@ async def add_filters_pipeline(request):
                     raise ValueError("Only 'true' and 'false' are allowed for "
                                      "allow_duplicates. {} given.".format(allow_duplicates))
 
-            if append_filter == 'true':
+            # If filter list is empty don't check current list value
+            # Empty list [] clears current pipeline
+            if append_filter == 'true' and filter_list:
                 # 'value' holds the string version of a list: convert it first  
                 current_value = json.loads(category_info[config_item]['value'])
                 # Save current list (deepcopy)
@@ -254,10 +257,12 @@ async def add_filters_pipeline(request):
                       "and config_item: {}".format(service_name, config_item)
             return web.HTTPNotFound(reason=message)
 
-        ###########################################################
-        # Add filters as child categories of parent category name #
-        ###########################################################
-        await cf_mgr.create_child_category(service_name, filter_list)
+        else:
+            # Add filters as child categories of parent category name
+            await cf_mgr.create_child_category(service_name, filter_list)
+
+            # Return the filters pipeline 
+            return web.json_response(json.loads(result['value']))
 
     except ValueError as ex:
         _LOGGER.exception("Add filters pipeline, caught exception: " + str(ex))
@@ -265,6 +270,3 @@ async def add_filters_pipeline(request):
     except Exception as ex:
         _LOGGER.exception("Add filters pipeline, caught exception: " + str(ex))
         raise web.HTTPInternalServerError(reason=str(ex))
- 
-    # Return the filters pipeline 
-    return web.json_response(json.loads(result['value']))
