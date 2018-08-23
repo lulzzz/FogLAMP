@@ -85,7 +85,7 @@ async def create_filter(request):
             return web.HTTPBadRequest(reason=message)
 
         # Sanity checks
-        if plugin_name != loaded_plugin_name or loaded_plugin_type != 'filer':
+        if plugin_name != loaded_plugin_name or loaded_plugin_type != 'filter':
             error_message = "Loaded plugin '{0}', type '{1}', doesn't match " + \
             "the specified one '{2}', type 'filter'"
             raise ValueError(error_message.format(loaded_plugin_name,
