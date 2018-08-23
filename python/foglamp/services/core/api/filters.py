@@ -10,11 +10,8 @@ import copy
 from aiohttp import web
 from foglamp.common.storage_client.payload_builder import PayloadBuilder
 from foglamp.common.configuration_manager import ConfigurationManager
-from foglamp.services.core import server
 from foglamp.services.core import connect
-from foglamp.services.core.scheduler.entities import Schedule, TimedSchedule, IntervalSchedule, ManualSchedule
 from foglamp.common.storage_client.exceptions import StorageServerError
-from foglamp.common import utils
 from foglamp.services.core.api import utils as apiutils
 from foglamp.common import logger
 
