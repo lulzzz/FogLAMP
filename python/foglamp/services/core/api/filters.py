@@ -258,7 +258,7 @@ async def add_filters_pipeline(request):
 
     except ValueError as ex:
         _LOGGER.exception("Add filters pipeline, caught exception: " + str(ex))
-        raise web.HTTPInternalServerError(reason=str(ex))
+        raise web.HTTPNotFound(reason=str(ex))
  
     # Return the filters pipeline 
     return web.json_response(json.loads(result['value']))
