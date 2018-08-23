@@ -122,7 +122,7 @@ async def create_filter(request):
         raise web.HTTPNotFound(reason=str(ex))
     except Exception as ex:
         _LOGGER.exception("Add filter, caught exception: " + str(ex))
-        raise web.HTTPInternalServer(reason=str(ex))
+        raise web.HTTPInternalServerError(reason=str(ex))
 
 """
     Add filter names to "filter" item in {service_name}
@@ -264,7 +264,7 @@ async def add_filters_pipeline(request):
         raise web.HTTPNotFound(reason=str(ex))
     except Exception as ex:
         _LOGGER.exception("Add filters pipeline, caught exception: " + str(ex))
-        raise web.HTTPInternalServer(reason=str(ex))
+        raise web.HTTPInternalServerError(reason=str(ex))
  
     # Return the filters pipeline 
     return web.json_response(json.loads(result['value']))
