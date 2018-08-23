@@ -24,15 +24,14 @@ __license__ = "Apache 2.0"
 __version__ = "${VERSION}"
 
 _help = """
-    --------------------------------------------------------------------------------------------
-    | POST            | /foglamp/filter                                                        |
-    | PUT             | /foglamp/filteri/{service_name}/pipeline                               |
-    | PUT             | /foglamp/filteri/{service_name}/pipeline?append_filter=true|false      |
-    | PUT             | /foglamp/filteri/{service_name}/pipeline?allow_duolicates=true|false   |
-    --------------------------------------------------------------------------------------------
+    ---------------------------------------------------------------------------
+    | POST            | /foglamp/filter                                       |
+    | PUT             | /foglamp/filter/{service_name}/pipeline               |
+    ---------------------------------------------------------------------------
 """
 
 _LOGGER = logger.setup("filter")
+
 
 async def create_filter(request):
     """
@@ -48,7 +47,7 @@ async def create_filter(request):
     'name' is the filter name
     'plugin' is the filter plugin name
 
-    The plugin is loaded and default comnfg from 'plugin_info'
+    The plugin is loaded and default config from 'plugin_info'
     is fetched.
 
     A new config category 'name' is created:
@@ -60,7 +59,7 @@ async def create_filter(request):
 
     """
     try:
-        # Get inout data
+        # Get inpout data
         data = await request.json()
         # Get filter name
         filter_name = data.get('name')
@@ -75,9 +74,9 @@ async def create_filter(request):
         # Get plugin default configuration (dict)
         plugin_config = loaded_plugin_info['config']
         # Get plugin type (string)
-        loaded_plugin_type = loaded_plugin_info['type'];
+        loaded_plugin_type = loaded_plugin_info['type']
         # Get plugin name (string)
-        loaded_plugin_name = plugin_config['plugin']['default'];
+        loaded_plugin_name = plugin_config['plugin']['default']
 
         # Check first whether fiter name already exists
         category_info = await cf_mgr.get_category_all_items(category_name = filter_name)
@@ -136,7 +135,7 @@ async def create_filter(request):
     }'
 
     Configuration item 'filter' is added to {service_name}
-    or updated with the pipeline arryay
+    or updated with the pipeline list
 
     Returns the filter pipeline on success:
     {"pipeline": ["Scale10Filter", "Python_assetCodeFilter"]} 
@@ -144,6 +143,16 @@ async def create_filter(request):
     Query string parameters:
     - append_filter=true|false       Default true
     - allow_duplicates=true|false    Default true
+
+    :Example:
+    curl -X PUT http://localhost:8081/foglamp/filter/NorthReadings_to_PI/pipeline?append_filter=true|false -d
+    '{
+        "pipeline": ["Scale10Filter", "Python_assetCodeFilter"],
+    }'
+    curl -X PUT http://localhost:8081/foglamp/filter/NorthReadings_to_PI/pipeline?allow_duplicates=true|false -d
+    '{
+        "pipeline": ["Scale10Filter", "Python_assetCodeFilter"],
+    }'
 
     NOTE: the method also adds the filters category names under
     parent category {service_name}
@@ -162,10 +171,11 @@ async def add_filters_pipeline(request):
 
         # Get configuration manager instance
         cf_mgr = ConfigurationManager(connect.get_storage_async())
+
         # Fetch the filter items: get category items
         category_info = await cf_mgr.get_category_all_items(category_name = service_name)
         if category_info is None:
-            # Error filter_name doesn't exist
+            # Error service__name doesn't exist
             message = "No such '%s' category found." % service_name
             return web.HTTPNotFound(reason=message)
 
@@ -219,7 +229,7 @@ async def add_filters_pipeline(request):
             # Add the "pipeline" array as a string
             new_item[config_item]['default'] = json.dumps({'pipeline' : filter_list})
 
-            # Update the filten category entru
+            # Update the filter category entry
             await cf_mgr.create_category(category_name=service_name,
                                          category_value=new_item,
                                          keep_original_items=True)
