@@ -120,6 +120,9 @@ async def create_filter(request):
     except ValueError as ex:
         _LOGGER.exception("Add filter, caught exception: " + str(ex))
         raise web.HTTPNotFound(reason=str(ex))
+    except Exception as ex:
+        _LOGGER.exception("Add filter, caught exception: " + str(ex))
+        raise web.HTTPInternalServer(reason=str(ex))
 
 """
     Add filter names to "filter" item in {service_name}
